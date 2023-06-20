@@ -1,0 +1,310 @@
+---
+title: "Datafest markdown(TAEHEE)"
+author: "TAEHEE KIM", "Nicole", "Samantha Alejandre"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+## client data
+```{r}
+library(readxl)
+rm(list = ls())
+clients <- read.csv("clients.csv")
+head(clients)
+```
+
+```{r}
+# Load required libraries
+library(tidyverse)
+library(ggplot2)
+library(ggthemes)
+library(maps)
+# Clean the dataset to only include relevant columns
+client_locs <- clients %>% 
+  select(ClientUno, StateAbbr, County, PostalCode, AnnualIncome)
+# Convert PostalCode to character and pad with leading zeros to ensure 5 digits
+client_locs$PostalCode <- str_pad(as.character(client_locs$PostalCode), width = 5, side = "left", pad = "0")
+
+client_locs<- na.omit(client_locs)
+client_locs<- client_locs[!client_locs$AnnualIncome == "NULL", ] 
+client_locs
+
+# Merge with map data to get state names and coordinates
+us_map <- map_data("state")
+client_locs <- client_locs %>%
+  left_join(us_map, by = c("StateAbbr"= "region"))
+
+us_map 
+# Group by state and count number of clients
+state_counts <- client_locs %>%
+  group_by(StateAbbr) %>%
+  summarise(num_clients = n()) %>%
+  arrange(desc(num_clients))
+
+state_counts
+
+# Plot the data on a map
+
+
+
+```
+```{r}
+#install.packages("usmap")
+library(usmap) #import the package
+library(ggplot2) #use ggplot2 to add layer 
+
+client_in <- client_locs %>% 
+  select(StateAbbr, AnnualIncome)
+client_in<- na.omit(client_in)
+
+# create a sample dataset
+income <- data.frame(StateAbbr = client_in$StateAbbr, 
+                 AnnualIncome = client_in$AnnualIncome)
+
+# calculate the average hours per state
+#mean vs median, outliers (mention )
+income_avg <- aggregate(as.numeric(AnnualIncome) ~ StateAbbr, data = income, FUN = median)
+colnames(income_avg)= c("state", "AverageIncome")
+colnames(state_counts)= c("state", "num_clients")
+# create the bar chart
+income
+income_avg
+state_counts
+# Join the two data frames
+income_data <- left_join(state_counts, income_avg, by = c("state"= "state"))
+
+# Calculate the attorney-to-client ratio
+income_data$income_client_ratio <-  income_data$AverageIncome/ income_data$num_clients
+
+income_ratio <- data.frame(StateAbbr = income_data$state,income_data$income_client_ratio )
+
+income_ratio
+
+ggplot(income_ratio, aes(x = StateAbbr, y = income_data$income_client_ratio)) +
+  geom_bar(stat = "identity") +
+  labs(x = "State", y = "Ratio") +
+  coord_flip()
+
+
+```
+
+```{r}
+
+library(usmap)
+library(ggplot2)
+colnames(state_counts)= c("state", "num_clients")
+plot_usmap(data = state_counts, values = "num_clients", include = state_counts$state , color = "blue") + scale_fill_continuous(low = "white", high = "blue", label = scales::comma) + theme(legend.position = "right")
+```
+
+```{r}
+attorney<- read_csv("attorneys.csv")
+head(attorney)
+
+attorney_locs<- attorney %>% select(AttorneyUno, StateAbbr, County, PostalCode) 
+
+attorney_locs$PostalCode <- str_pad(as.character(attorney_locs$PostalCode), width = 5, side = "left", pad = "0")
+
+attorney_locs<- na.omit(attorney_locs)
+
+state_counts3 <- attorney_locs %>%
+  group_by(StateAbbr) %>%
+  summarise(num_attorney = n()) %>%
+  arrange(desc(num_attorney))
+
+state_counts3
+
+```
+```{r}
+colnames(state_counts3)= c("state", "num_attorney")
+plot_usmap(data = state_counts3, values = "num_attorney", include = state_counts3$state , color = "blue") + scale_fill_continuous(low = "white", high = "blue", label = scales::comma) + theme(legend.position = "right")
+```
+```{r}
+colnames(state_ratio)= c("state", "ClientToAttorney")
+state_ratio
+p1<- plot_usmap(data = state_ratio, values = "ClientToAttorney", include = state_ratio$state , color = "blue") + scale_fill_continuous(low = "white", high = "blue", label = scales::comma) + theme(legend.position = "right")
+```
+```{r}
+p2 <- plot_usmap(data = income_data, values = "AverageIncome", include = income_data$state , color = "red") + scale_fill_continuous(low = "white", high = "red", label = scales::comma) + theme(legend.position = "right")
+```
+
+```{r}
+# Combine the ggplot objects using ggarrange()
+install.packages("ggpubr")
+library(ggpubr)
+ggarrange(p1, p2, ncol = 2, nrow = 2)
+```
+
+
+
+```{r}
+attorney_time<- read_csv("attorneytimeentries.csv")
+head(attorney_time)
+attorney_time<- attorney_time %>% select( StateAbbr, Hours, EnteredOnUtc) 
+attorney_time
+#number attonery per client request
+#external data population centsus per state, num of attery per captial 
+```
+
+```{r}
+library(ggplot2)
+
+# create a sample dataset
+df <- data.frame(StateAbbr = attorney_time$StateAbbr, 
+                 Hours = attorney_time$Hours)
+
+# calculate the average hours per state
+df_avg <- aggregate(Hours ~ StateAbbr, data = df, FUN = mean)
+
+df_avg[nrow(df_avg) + 1,] <- list("ID", 0)
+
+# create the bar chart
+ggplot(df_avg, aes(x = StateAbbr, y = Hours)) +
+  geom_bar(stat = "identity") +
+  labs(x = "State", y = "Average Hours") +
+  coord_flip()
+
+```
+
+
+```{r}
+library(ggplot2)
+
+
+
+# create a sample dataset
+df <- data.frame(StateAbbr = attorney_time$StateAbbr, 
+                 Hours = attorney_time$Hours)
+
+# calculate the average hours per state
+df_avg <- aggregate(Hours ~ StateAbbr, data = df, FUN = mean)
+colnames(df_avg)= c("state", "average_hours")
+
+
+# create the bar chart
+ggplot(df_avg, aes(x = StateAbbr, y = Hours)) +
+  geom_bar(stat = "identity") +
+  labs(x = "State", y = "Average Hours") +
+  coord_flip()
+
+```
+```{r}
+beforecovid<- read_csv("G:/My Drive/DataFest/Shared Work/New subdata(Eric. Before covid, after covid)/
+                       extractbeforecovid(attorney).csv")
+bef_covid <- data.frame(StateAbbr = beforecovid$StateAbbr, 
+                 Hours = beforecovid$Hours)
+
+bef_covid
+before_avg <- aggregate(Hours ~ StateAbbr, data = bef_covid, FUN = mean)
+ggplot(before_avg, aes(x = StateAbbr, y = Hours)) +
+  geom_bar(stat = "identity") +
+  labs(x = "State", y = "Average Hours") +
+  coord_flip()
+```
+
+```{r}
+aftercovid<- read_csv("extractaftercovid(attorney).csv")
+after_cov<- data.frame(StateAbbr = aftercovid$StateAbbr, 
+                 Hours = aftercovid$Hours)
+after_avg <- aggregate(Hours ~ StateAbbr, data = after_cov, FUN = mean)
+ggplot(after_avg, aes(x = StateAbbr, y = Hours)) +
+  geom_bar(stat = "identity") +
+  labs(x = "State", y = "Average Hours") +
+  coord_flip()
+library(yarrr)
+hgA <- hist(after_avg$Hours, breaks = 12)
+hgB <- hist(before_avg$Hours)
+range(c(hgA$breaks, hgB$breaks))
+max(c(hgA$count, hgB$count))
+plot(hgA, col = yarrr::transparent("red", trans.val = .9), xlim = c(0.1, 1.4), ylim = c(0,18), fill= "transparent")
+plot(hgB, add = TRUE, col = yarrr::transparent("blue", trans.val = .9), fill= "transparent")
+```
+```{r}
+ggplot(hgB, aes(f0)) + 
+    geom_histogram(data = after_avg, fill = "red", alpha = 0.2) + 
+    geom_histogram(data = before_avg, fill = "blue", alpha = 0.2) 
+    
+```
+
+beforeaverage<- read_csv("before_avg.csv")
+View(beforeaverage)
+
+
+afteraverage<- read_csv("after_avg.csv")
+View(afteraverage)
+
+afterminusbefore_avg <-data.frame( StateAbbr= afteraverage$StateAbbr, DIfference= afteraverage$Hours - beforeaverage$Hours)
+
+View(afterminusbefore_avg)
+
+
+
+#after-before ggplot(don't erase this!)
+after-before_avg <- aggregate(Hours ~ StateAbbr, data = bef_covid, FUN = mean) - aggregate(Hours ~ StateAbbr, data = after_cov, FUN = mean)
+ggplot(after-before_avg, aes(x = StateAbbr, y = Hours)) +
+  geom_bar(stat = "identity") +
+  labs(x = "State", y = "Average Hours") +
+  coord_flip()
+
+write.csv(before_avg, "before_avg.csv", row.names=FALSE, quote=FALSE)
+write.csv(after_avg, "after_avg.csv", row.names=FALSE, quote=FALSE)
+
+ggplot(afterminusbefore_avg, aes(x = StateAbbr, y = DIfference)) +
+  geom_bar(stat = "identity") +
+  labs(x = "State", y = "Difference") +
+  coord_flip()
+  
+```{r}
+ggplot(afterminusbefore_avg, aes(x = StateAbbr, y = DIfference)) +
+  geom_bar(stat = "identity") +
+  labs(x = "State", y = "Difference") +
+  coord_flip()
+```
+```{r}
+ggplot(afterminusbefore_avg, aes(x = StateAbbr, y = DIfference, fill = DIfference)) +
+  geom_bar(stat = "identity", width = 0.9) +
+  labs(x = "State", y = "Difference") +
+  scale_fill_gradient(low = "white", high = "darkblue") +
+  coord_flip() +
+  theme_minimal() + 
+  theme(axis.title.x = element_text(size = 12, face = "bold", color = "black"),
+        axis.title.y = element_text(size = 12, face = "bold", color = "black"))
+
+```
+
+
+
+
+```{r}
+# Join the two data frames
+state_data <- left_join(state_counts, state_counts3, by = c("state" = "state"))
+
+# Calculate the attorney-to-client ratio
+state_data$attorney_client_ratio <-  state_data$num_clients/ state_data$num_attorney
+
+state_ratio <- data.frame(StateAbbr = state_data$state,state_data$attorney_client_ratio )
+
+state_ratio
+
+ggplot(state_ratio, aes(x = StateAbbr, y = state_data.attorney_client_ratio)) +
+  geom_bar(stat = "identity") +
+  labs(x = "State", y = "Ratio") +
+  coord_flip()
+
+```
+```{r}
+final <- data.frame(AverageHours= df_avg$Hours, IncomePerState= income_data$average_state,ClientRatio= state_ratio$state_data.attorney_client_ratio)
+
+
+attach(final)
+plot(AverageHours, IncomePerState, main="Scatterplot Example",
+   xlab="Average Hours ", ylab="Client per Attonery ", pch=19)
+
+	
+hist(final)
+
+```
